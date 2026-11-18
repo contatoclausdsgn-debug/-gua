@@ -117,11 +117,9 @@ async function drink(fromTag){
   await Promise.race([readyP,new Promise(r=>setTimeout(r,5000))]);
   const l=todayList();
   if(fromTag&&l.length&&Date.now()-l[l.length-1].ts<COOLDOWN){say("Já registrei agora há pouco 😉");return}
-  try{
-    await addDoc(col,{ts:Date.now(),dia:today()});
-    popup(l.length+1);
-    say("Boa! Mais um copo 💧");
-  }catch(e){say("Não consegui salvar. Confira a internet e as regras do Firebase.")}
+  popup(l.length+1);
+  say("Boa! Mais um copo 💧");
+  addDoc(col,{ts:Date.now(),dia:today()}).catch(()=>say("Não consegui salvar. Confira a internet e as regras do Firebase."));
 }
 
 $("add").onclick=()=>drink(false);
