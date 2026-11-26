@@ -30,6 +30,10 @@ h1{font-size:18px;margin:0 0 16px;color:var(--muted);font-weight:600;text-align:
 .st{aspect-ratio:1;border-radius:18px;background:var(--lock);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:40px;filter:grayscale(1);opacity:.45}
 .st small{font-size:11px;margin-top:4px;color:var(--text);text-align:center;padding:0 4px}
 .st.on{filter:none;opacity:1;background:var(--accent2);animation:pop .5s}
+.sticker-card{background:var(--lock);border-radius:16px;padding:8px;text-align:center;min-width:0}
+.sticker-card img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:12px;display:block}
+.sticker-card.locked img{filter:grayscale(1);opacity:.22}
+.sticker-card small{display:block;font-size:11px;color:var(--muted);margin-top:5px}
 @keyframes pop{0%{transform:scale(.6)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
 .week{display:flex;gap:8px;align-items:flex-end;height:90px}
 .week div{flex:1;text-align:center;font-size:11px;color:var(--muted)}
@@ -54,6 +58,7 @@ button.alt{background:var(--lock);color:var(--text)}
 <div class="modal" id="modal"><div class="pop"><img class="big" id="pe" alt=""><div class="pt" id="pt"></div><div class="pc" id="pc"></div><button id="ok">Fechar</button></div></div>
 <div class="card"><h2>Hoje</h2><div class="times" id="times"></div></div>
 <div class="card"><h2>Últimos 7 dias</h2><div class="week" id="wk"></div></div>
+<div class="card"><h2>Minha coleção</h2><p class="empty" style="margin:0 0 10px">Beba água para desbloquear as figurinhas de hoje.</p><div class="stickers" id="stickers"></div></div>
 <div class="row">
   <button id="add">+ Beber</button>
   <button class="alt" id="undo">Desfazer</button>
@@ -108,6 +113,8 @@ function render(){
   const counts=days.map(d=>docs.filter(x=>x.dia===dk(d)).length);
   const max=Math.max(GOAL,...counts);
   $("wk").innerHTML=days.map((d,i)=>`<div><b style="height:${counts[i]/max*60}px"></b>${counts[i]}<br>${"DSTQQSS"[d.getDay()]}</div>`).join("");
+  const unlocked=Math.min(c,ORDER.length);
+  $("stickers").innerHTML=ORDER.map((imgIndex,i)=>`<div class="sticker-card ${i<unlocked?"":"locked"}"><img src="${IMGS[imgIndex]}" alt="Figurinha ${i+1}"><small>${i<unlocked?"Desbloqueada":"Bloqueada"}</small></div>`).join("");
 }
 
 let closeT;
