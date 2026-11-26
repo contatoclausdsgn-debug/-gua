@@ -64,7 +64,7 @@ button.alt{background:var(--lock);color:var(--text)}
 <p id="dbg" style="text-align:center;color:var(--muted);font-size:11px;line-height:1.6;margin-top:4px"></p>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {initializeFirestore,collection,addDoc,deleteDoc,doc,query,where,onSnapshot,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,collection,deleteDoc,doc,query,where,onSnapshot,writeBatch,setDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // 1) COLE AQUI a configuração do seu projeto Firebase (veja o LEIA-ME.md)
 const firebaseConfig = {
@@ -88,7 +88,13 @@ function log(t){try{const a=JSON.parse(localStorage.getItem("agua_log")||"[]");a
 const dk=d=>{const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
 const today=()=>dk(Date.now());
 
-let gotSnap=false, docs=[], ready, rejectReady, readyP=new Promise((resolve,reject)=>{ready=resolve;rejectReady=reject}), col=null, db=null;
+let docs=[], col=null, db=null;
+const CACHE_KEY="agua_goles_cache_v1";
+// Mostra imediatamente a última contagem conhecida neste aparelho.
+try{
+  const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||"[]");
+  if(Array.isArray(cached)) docs=cached.filter(x=>x && typeof x.ts==="number" && typeof x.dia==="string");
+}catch(e){}
 const configured=firebaseConfig.apiKey!=="COLE_AQUI";
 
 const todayList=()=>docs.filter(d=>d.dia===today()).sort((a,b)=>a.ts-b.ts);
@@ -118,20 +124,21 @@ $("modal").onclick=e=>{if(e.target.id==="modal")e.target.classList.remove("show"
 
 async function drink(fromTag){
   if(!configured){say("Falta colar a configuração do Firebase");return}
+  const ts=Date.now(), dia=today(), ref=doc(col);
+  const record={id:ref.id,ts,dia};
+  // Atualização otimista: a interface responde sem esperar a rede.
+  docs.push(record);
+  render();
+  popup(todayList().length);
+  say("Boa! Mais um copo 💧");
+  log((fromTag?"abertura":"botão")+": registrou copo "+todayList().length);
   try{
-    // O registro automático só acontece depois que o primeiro snapshot do Firestore carregar.
-    if(fromTag) await readyP;
-    else if(!gotSnap) await readyP;
-
-    const l=todayList();
-    const nextCount=l.length+1;
-    // Aguarda a gravação: só confirma visualmente quando o Firebase aceitar o registro.
-    await addDoc(col,{ts:Date.now(),dia:today()});
-    popup(nextCount);
-    say("Boa! Mais um copo 💧");
-    log((fromTag?"abertura":"botão")+": registrou copo "+nextCount);
+    // Usa o mesmo ID na interface e no Firestore para evitar duplicidade visual.
+    await setDoc(ref,{ts,dia});
   }catch(e){
-    say("Não consegui registrar. Verifique a conexão e as regras do Firebase.");
+    docs=docs.filter(x=>x.id!==ref.id);
+    render();
+    say("Não consegui sincronizar. Verifique a conexão.");
     log("ERRO ao registrar: "+(e?.code||e?.message||"desconhecido"));
   }
 }
@@ -171,10 +178,14 @@ if(!configured){
   db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true}); col=collection(db,"goles");
   const start=new Date();start.setDate(start.getDate()-6);start.setHours(0,0,0,0);
   onSnapshot(query(col,where("ts",">=",start.getTime())),
-    snap=>{gotSnap=true;docs=snap.docs.map(d=>({id:d.id,...d.data()}));ready();render()},
-    err=>{say("Sem conexão com o banco de dados");if(!gotSnap)rejectReady(err)});
+    snap=>{
+      docs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      try{localStorage.setItem(CACHE_KEY,JSON.stringify(docs))}catch(e){}
+      render();
+    },
+    err=>{say("Sem conexão com o banco de dados; mostrando a última contagem salva.");log("ERRO ao sincronizar: "+(err?.code||err?.message||"desconhecido"))});
+  // A abertura registra sem aguardar o primeiro carregamento do histórico.
   checkHash();
-  setTimeout(()=>{if(!gotSnap)say("Conectando ao banco de dados...")},4000);
   window.addEventListener("hashchange",()=>{if(location.hash==="#beber")checkHash()});
 }
 </script>
